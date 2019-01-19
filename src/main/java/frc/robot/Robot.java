@@ -2,16 +2,20 @@ package frc.robot;
 
 import com.ctre.phoenix.motorcontrol.can.WPI_VictorSPX;
 
+import edu.wpi.cscore.UsbCamera;
 import edu.wpi.first.cameraserver.CameraServer;
 import edu.wpi.first.wpilibj.Compressor;
 import edu.wpi.first.wpilibj.DoubleSolenoid;
 import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.PowerDistributionPanel;
+import edu.wpi.first.wpilibj.Spark;
 import edu.wpi.first.wpilibj.SpeedController;
 import edu.wpi.first.wpilibj.SpeedControllerGroup;
 import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj.DoubleSolenoid.Value;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj.Joystick;
 
 /**
@@ -21,9 +25,19 @@ import edu.wpi.first.wpilibj.Joystick;
  * creating this project, you must also update the build.gradle file in the
  * project.
  */
+// Previous Values on A_BUTTON = 1 and B_BUTTON = 2
+
 public class Robot extends TimedRobot {
   private static final int A_BUTTON = 1;
   private static final int B_BUTTON = 2; 
+  private static final int RIGHT_Y_AXIS = 5;
+  private static final int LEFT_BUMPER_BUTTON = 5;
+  private static final int RIGHT_BUMPER_BUTTON = 6; 
+  
+  // Designed for Extreme 3D Pro; Camera switching 
+  private static final int CAM_BUTTON_FRONT = 11;
+  private static final int CAM_BUTTON_BACK = 12;
+  private static final int CAM_BUTTON_BOTH = 10;
 
 private static final int CAN_LEFT_FRONT_MOTOR_CONTROLLER = 1;
 private static final int CAN_RIGHT_FRONT_MOTOR_CONTROLLER = 3;
@@ -33,8 +47,9 @@ private static final int CAN_RIGHT_REAR_MOTOR_CONTROLLER = 2;
 private static final int PCM_SOLENOID_FORWARD = 0;
 private static final int PCM_SOLENOID_REVERSE = 7;
 
-
-
+private static final int PWM_BALL_ANGLE = 0;
+private static final int CAN_TOP_ROLLER = 4;
+private static final int CAN_BOTTOM_ROLLER = 5; 
 
   // Robot Drive Components
   private SpeedController leftFront;
@@ -45,10 +60,23 @@ private static final int PCM_SOLENOID_REVERSE = 7;
   private SpeedControllerGroup right;
   private DifferentialDrive drive;
   private GenericHID driverOne;
+  private GenericHID driverTwo;
+  private SpeedController ballAngle; 
+  private SpeedController topRoller;
+  private SpeedController bottomRoller; 
 
   private PowerDistributionPanel pdp;
   private Compressor compressor;
   private DoubleSolenoid solenoid;
+
+  private UsbCamera front = null;
+  private UsbCamera rear = null;
+
+  // Still working on this 
+  //private BallAssembly ;
+
+  // May need to use this for camera switching 
+// private UsbCamera camera; 
 
   /**
    * This function is run when the robot is first started up and should be
@@ -63,13 +91,31 @@ private static final int PCM_SOLENOID_REVERSE = 7;
     rightRear = new WPI_VictorSPX(CAN_RIGHT_REAR_MOTOR_CONTROLLER);
     right = new SpeedControllerGroup(rightFront, rightRear);
     drive = new DifferentialDrive(left, right);
+    
+    ballAngle = new Spark(Robot.PWM_BALL_ANGLE);
+    topRoller = new WPI_VictorSPX(Robot.CAN_TOP_ROLLER);
+    bottomRoller = new WPI_VictorSPX(Robot.CAN_BOTTOM_ROLLER);
 
     driverOne = new Joystick(0);
+    driverTwo = new XboxController(1);
+
     compressor = new Compressor();
     compressor.setClosedLoopControl(true);
     solenoid = new DoubleSolenoid(PCM_SOLENOID_FORWARD, PCM_SOLENOID_REVERSE);
     solenoid.set(Value.kOff);
-    CameraServer.getInstance().startAutomaticCapture();
+
+    rear = CameraServer.getInstance().startAutomaticCapture(0);
+    front = CameraServer.getInstance().startAutomaticCapture(1);
+
+    rear.setResolution(800, 600);
+    front.setResolution(1600, 1200);
+
+    pdp = new PowerDistributionPanel();
+
+     
+    //Trying to find the function in order to switch cameras
+    //camera = UsbCamera
+   
   }
 
   /**P
@@ -113,22 +159,78 @@ private static final int PCM_SOLENOID_REVERSE = 7;
   public void teleopPeriodic() {
     drive.arcadeDrive(-driverOne.getRawAxis(1), driverOne.getRawAxis(0));
 
-    if (driverOne.getRawButton(A_BUTTON)) {
+    ballAngle.set(driverTwo.getRawAxis(Robot.RIGHT_Y_AXIS));
+    SmartDashboard.putNumber("left speed", left.get());
+    SmartDashboard.putNumber("right speed", -right.get());
+    if (driverTwo.getRawButton(A_BUTTON)) {
       solenoid.set(Value.kForward);
-    } else if (driverOne.getRawButton(B_BUTTON)) {
+    } else if (driverTwo.getRawButton(B_BUTTON)) {
       solenoid.set(Value.kReverse);
     } 
-  }
+    
+    if (driverTwo.getRawButton(Robot.LEFT_BUMPER_BUTTON)) {
+      topRoller.set(1);
+      bottomRoller.set(1);
+    } else if (driverTwo.getRawButton(Robot.RIGHT_BUMPER_BUTTON)) {
+      topRoller.set(-1);
+      bottomRoller.set(-1);
+    } else {
+      topRoller.set(0);
+      bottomRoller.set(0);
+    }
 
+    
+   // Experimental Setup Camera
+   // Cameras in this script may run in a loop 
+   // By switching Camera we can save bandwidth and have clearer images. 
+   // If needed we can use both at the same time (In theory with the use of 10 button)
+   // Front Camera should be camera 0 and should start automatically and can be switched to front with 11
+   // Back Camera should be activated with use of button 12 
+   // May need to use USB 
+   // Cameraserver.getInstance().startautomaticCapture maybe the wrong way of calling the different cameras
+
+
+  //  if (driverOne.getRawButton(CAM_BUTTON_FRONT)) {
+  //    if (rear != null) {
+  //     CameraServer.getInstance().removeCamera("rear");
+  //     rear = null;
+  //    }
+
+  //    if (front == null) {
+  //     front = CameraServer.getInstance().startAutomaticCapture("front", 0);
+  //   }
+     
+  // } else if (driverOne.getRawButton(CAM_BUTTON_BACK)) {
+  //   if (front != null) {
+  //     CameraServer.getInstance().removeCamera("front");
+  //     front = null;
+  //   }
+
+  //   if (rear == null) {
+  //     rear = CameraServer.getInstance().startAutomaticCapture("rear",1);
+  //   }
+  // } else if (driverOne.getRawButton(CAM_BUTTON_BOTH)) {
+  //   if (front == null) {
+  //     front = CameraServer.getInstance().startAutomaticCapture("front", 0);
+  //   }
+    
+  //   if (rear == null) {
+  //     rear = CameraServer.getInstance().startAutomaticCapture("rear",1);
+  //   }  
+
+  // } 
+  
+
+}
   /**
    * This function is called periodically during test mode.
    */
   @Override
   public void testPeriodic() {
+    if (driverTwo.getRawButton(Robot.A_BUTTON)) {
+      pdp.clearStickyFaults();
+    }
   }
 }
-
-
-
 
 
