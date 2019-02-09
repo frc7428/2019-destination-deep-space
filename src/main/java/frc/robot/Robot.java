@@ -96,10 +96,6 @@ public class Robot extends TimedRobot {
 
     rear.setResolution(1600, 1200);
     front.setResolution(1600, 1200);
-
-    //Trying to find the function in order to switch cameras
-    //camera = UsbCamera
-   
   }
 
   /**P
