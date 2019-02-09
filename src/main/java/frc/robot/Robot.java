@@ -5,9 +5,11 @@ import com.ctre.phoenix.motorcontrol.can.WPI_VictorSPX;
 import edu.wpi.cscore.UsbCamera;
 import edu.wpi.first.cameraserver.CameraServer;
 import edu.wpi.first.wpilibj.Compressor;
+import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj.DoubleSolenoid;
 import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.PowerDistributionPanel;
+import edu.wpi.first.wpilibj.Solenoid;
 import edu.wpi.first.wpilibj.Spark;
 import edu.wpi.first.wpilibj.SpeedController;
 import edu.wpi.first.wpilibj.SpeedControllerGroup;
@@ -30,9 +32,17 @@ import edu.wpi.first.wpilibj.Joystick;
 public class Robot extends TimedRobot {
   private static final int A_BUTTON = 1;
   private static final int B_BUTTON = 2; 
-  private static final int RIGHT_Y_AXIS = 5;
+  private static final int Y_BUTTON = 4;
+  private static final int X_BUTTON = 3;
+
+  //private static final int RIGHT_Y_AXIS = 5;
   private static final int LEFT_BUMPER_BUTTON = 5;
   private static final int RIGHT_BUMPER_BUTTON = 6; 
+  private static final int BACK_BUTTON = 7;
+  private static final int START_BUTTON = 8;
+  private static final int TRIGGER_BUTTON = 1;
+  private static final int SIDETRIGGER_BUTTON = 2;
+
   
   // Designed for Extreme 3D Pro; Camera switching 
   private static final int CAM_BUTTON_FRONT = 11;
@@ -44,14 +54,25 @@ private static final int CAN_RIGHT_FRONT_MOTOR_CONTROLLER = 3;
 private static final int CAN_LEFT_REAR_MOTOR_CONTROLLER = 0;
 private static final int CAN_RIGHT_REAR_MOTOR_CONTROLLER = 2;
 
-private static final int PCM_SOLENOID_FORWARD = 0;
-private static final int PCM_SOLENOID_REVERSE = 7;
+private static final int PCM_SOLENOID_FORWARD = 5;
+private static final int PCM_SOLENOID_REVERSE = 2;
 
-private static final int PWM_BALL_ANGLE = 0;
+private static final int PCM_SOLENOID_OPEN_HATCH = 0;
+private static final int PCM_SOLENOID_CLOSE_HATCH = 7;
+
+private static final int PCM_SOLENOID_IN_HOLDER = 1;
+private static final int PCM_SOLENOID_OUT_HOLDER = 6;
+
+private static final int PCM_SOLENOID_RAISE = 3;
+private static final int PCM_SOLENOID_LOWER = 4;
+
+
+//private static final int CAN_BALL_ANGLE = 4;
 private static final int CAN_TOP_ROLLER = 4;
 private static final int CAN_BOTTOM_ROLLER = 5; 
 
-  // Robot Drive Components
+
+// Robot Drive Components
   private SpeedController leftFront;
   private SpeedController leftRear;
   private SpeedController rightFront;
@@ -61,13 +82,17 @@ private static final int CAN_BOTTOM_ROLLER = 5;
   private DifferentialDrive drive;
   private GenericHID driverOne;
   private GenericHID driverTwo;
-  private SpeedController ballAngle; 
+  //private SpeedController ballAngle; 
   private SpeedController topRoller;
   private SpeedController bottomRoller; 
 
-  private PowerDistributionPanel pdp;
+  //private PowerDistributionPanel pdp;
   private Compressor compressor;
   private DoubleSolenoid solenoid;
+  private DoubleSolenoid solenoidHatch;
+  private DoubleSolenoid solenoidHolder;
+  private DoubleSolenoid solenoidLift;
+
 
   private UsbCamera front = null;
   private UsbCamera rear = null;
@@ -92,27 +117,33 @@ private static final int CAN_BOTTOM_ROLLER = 5;
     right = new SpeedControllerGroup(rightFront, rightRear);
     drive = new DifferentialDrive(left, right);
     
-    ballAngle = new Spark(Robot.PWM_BALL_ANGLE);
+    //ballAngle = new Spark(Robot.PWM_BALL_ANGLE);
     topRoller = new WPI_VictorSPX(Robot.CAN_TOP_ROLLER);
     bottomRoller = new WPI_VictorSPX(Robot.CAN_BOTTOM_ROLLER);
-
-    driverOne = new Joystick(0);
-    driverTwo = new XboxController(1);
+//  switched
+    driverOne = new Joystick(1);
+    driverTwo = new XboxController(0);
 
     compressor = new Compressor();
     compressor.setClosedLoopControl(true);
     solenoid = new DoubleSolenoid(PCM_SOLENOID_FORWARD, PCM_SOLENOID_REVERSE);
     solenoid.set(Value.kOff);
 
+    solenoidHatch = new DoubleSolenoid(PCM_SOLENOID_OPEN_HATCH,PCM_SOLENOID_CLOSE_HATCH);
+    solenoidHatch.set(Value.kOff);
+
+    solenoidHolder = new DoubleSolenoid(PCM_SOLENOID_IN_HOLDER,PCM_SOLENOID_OUT_HOLDER);
+    solenoid.set(Value.kOff);
+
+    solenoidLift = new DoubleSolenoid(PCM_SOLENOID_RAISE,PCM_SOLENOID_LOWER);
+    solenoid.set(Value.kOff);
+
     rear = CameraServer.getInstance().startAutomaticCapture(0);
     front = CameraServer.getInstance().startAutomaticCapture(1);
 
-    rear.setResolution(800, 600);
+    rear.setResolution(1600, 1200);
     front.setResolution(1600, 1200);
 
-    pdp = new PowerDistributionPanel();
-
-     
     //Trying to find the function in order to switch cameras
     //camera = UsbCamera
    
@@ -150,6 +181,7 @@ private static final int CAN_BOTTOM_ROLLER = 5;
    */
   @Override
   public void autonomousPeriodic() {
+    this.teleopPeriodic();
   }
 
   /**
@@ -159,27 +191,39 @@ private static final int CAN_BOTTOM_ROLLER = 5;
   public void teleopPeriodic() {
     drive.arcadeDrive(-driverOne.getRawAxis(1), driverOne.getRawAxis(0));
 
-    ballAngle.set(driverTwo.getRawAxis(Robot.RIGHT_Y_AXIS));
+    //ballAngle.set(driverTwo.getRawAxis(Robot.RIGHT_Y_AXIS));
     SmartDashboard.putNumber("left speed", left.get());
     SmartDashboard.putNumber("right speed", -right.get());
-    if (driverTwo.getRawButton(A_BUTTON)) {
-      solenoid.set(Value.kForward);
-    } else if (driverTwo.getRawButton(B_BUTTON)) {
-      solenoid.set(Value.kReverse);
-    } 
+    SmartDashboard.putBoolean("Cylinder Out", solenoidHolder.get() == Value.kForward);
     
     if (driverTwo.getRawButton(Robot.LEFT_BUMPER_BUTTON)) {
       topRoller.set(1);
-      bottomRoller.set(1);
+      bottomRoller.set(-1);
     } else if (driverTwo.getRawButton(Robot.RIGHT_BUMPER_BUTTON)) {
       topRoller.set(-1);
-      bottomRoller.set(-1);
+      bottomRoller.set(1);
     } else {
       topRoller.set(0);
       bottomRoller.set(0);
     }
 
-    
+    // Maybe add this as a timed command
+    if (driverTwo.getRawButton(Y_BUTTON)) {
+      solenoidHatch.set(solenoidHatch.get() == Value.kReverse ? Value.kForward : Value.kReverse);
+    }
+
+    if (driverTwo.getRawButton(BACK_BUTTON)) {
+      solenoidHolder.set(solenoidHolder.get() == Value.kReverse ? Value.kForward : Value.kReverse);
+    }
+
+    if (driverTwo.getRawButton(A_BUTTON)) {
+      solenoid.set(solenoid.get() == Value.kForward ? Value.kReverse : Value.kForward);
+    }
+
+    if (driverOne.getRawButton(TRIGGER_BUTTON)) {
+      solenoidLift.set(solenoidLift.get() == Value.kReverse ? Value.kForward : Value.kReverse);
+    }
+
    // Experimental Setup Camera
    // Cameras in this script may run in a loop 
    // By switching Camera we can save bandwidth and have clearer images. 
@@ -228,7 +272,7 @@ private static final int CAN_BOTTOM_ROLLER = 5;
   @Override
   public void testPeriodic() {
     if (driverTwo.getRawButton(Robot.A_BUTTON)) {
-      pdp.clearStickyFaults();
+      //pdp.clearStickyFaults();
     }
   }
 }
