@@ -168,7 +168,7 @@ public class Robot extends TimedRobot {
       solenoid.set(solenoid.get() == Value.kForward ? Value.kReverse : Value.kForward);
     }
 
-    if (driverOne.getRawButton(RobotMap.TRIGGER_BUTTON)) {
+    if (driverOne.getRawButton(RobotMap.JOYSTICK_TRIGGER_BUTTON)) {
       solenoidLift.set(solenoidLift.get() == Value.kReverse ? Value.kForward : Value.kReverse);
     }
 }
