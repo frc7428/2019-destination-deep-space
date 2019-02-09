@@ -30,7 +30,6 @@ public class RobotMap {
     public static final int PCM_SOLENOID_RAISE = 3;
     public static final int PCM_SOLENOID_LOWER = 4;
 
-
     public static final int CAN_TOP_ROLLER = 4;
     public static final int CAN_BOTTOM_ROLLER = 5;
 }
