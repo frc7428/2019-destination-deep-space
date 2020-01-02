@@ -1,4 +1,4 @@
-# 2020 DESTINATION DEEP SPACE
+# 2019 DESTINATION DEEP SPACE
 
 This repository contains robot code for the 2019 *FIRST*<sup>&reg;</sup> Robotics Competition season DESTINATION DEEP SPACE RECHARGE<sup>SM</sup>.
 
